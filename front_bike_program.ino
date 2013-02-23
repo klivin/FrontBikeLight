@@ -1,6 +1,6 @@
 #include <SPI.h>
-#include "nRF24L01.h"
-#include "RF24.h"
+#include "vendor/rf24/nRF24L01.h"
+#include "vendor/rf24/RF24.h"
 #include <avr/io.h>
 //#include "TimerOne.h"
 #include "printf.h"
