@@ -8,21 +8,25 @@
 #ifndef __BIKE_LIGHT_CONSTANTS_H__
 #define __BIKE_LIGHT_CONSTANTS_H__
 
-enum LedState {
-  LED_STATE_RIGHT=99,
-  LED_STATE_LEFT=100,
-  LED_STATE_ALL_OFF=101,
-  LED_STATE_ALL_ON=102,
-  LED_STATE_ANIMATION_1=103,
-  LED_TOTAL_STATES=104
+typedef enum ButtonPress {
+  BUTTON_PRESS_NONE,
+  BUTTON_PRESS_LEFT,
+  BUTTON_PRESS_RIGHT,
+  BUTTON_PRESS_MODE,
+  BUTTON_PRESS_CANCEL  
 };
 
-enum LedDefaultState {
-  LED_DEFAULT_STATE_ALL_OFF=LED_STATE_ALL_OFF,
-  LED_DEFAULT_STATE_ALL_ON=LED_STATE_ALL_ON,
-  LED_DEFAULT_STATE_ANIMATION_1=LED_STATE_ANIMATION_1,
-  LED_TOTAL_DEFAULT_STATES=LED_TOTAL_STATES
+typedef enum LedState {
+  LED_STATE_NONE=98,
+  LED_STATE_RIGHT, //99
+  LED_STATE_LEFT, //100
+  LED_STATE_ALL_OFF, //101
+  LED_STATE_ALL_ON, //102
+  LED_STATE_PIN_WHEEL, //103
+  LED_STATE_BLINK, //104
+  LED_TOTAL_STATES //105
 };
+
 
 enum RadioState {
    RADIO_STATE_OFF,
@@ -41,15 +45,18 @@ enum HornState {
 // INITIAL CONFIGURATION
 
 int buttonPushCounter = 0;   // counter for the number of button presses
-
+int currentTimerID = 0;
 const unsigned long SIGNAL_TIME_MILLI = 3000000; // 3 seconds
 const unsigned long CHIRP_TIMER_MILLI = 4000000; // 4 seconds
-const unsigned long DOUBLE_CLICK_TIMER_MILLI = 200; // .2 second
+const unsigned long DOUBLE_CLICK_TIMER_MILLI = 20000; // .2 second
+const unsigned long DELAY_FOR_MODEM_SIGNAL = 100000; // .2 second
 
 const unsigned long STANDARD_DELAY_MILLI = 20;
-volatile unsigned int currentLedState = LED_STATE_RIGHT;
 volatile unsigned int oldLedState = LED_STATE_LEFT;
-volatile unsigned int ledDefaultState = LED_DEFAULT_STATE_ALL_OFF;
+//volatile unsigned int ledDefaultState = LED_STATE_RIGHT;
+volatile unsigned int ledDefaultState = LED_STATE_BLINK;
+volatile unsigned int currentLedState = ledDefaultState;
+
 
 volatile boolean shouldWriteNewState = false;
 volatile boolean signalTimerExpired = true;
@@ -60,26 +67,36 @@ static int doubleClickTimer = 0;
 
 // ============================================================================ //
 // PINS SETUP
-// need to make this pin different for the remote side
-const int LED_9_PIN      = 12;
-// Need to make this pin different for the remote side
 
-const int SERIAL_TX      = 7;
-const int SERIAL_RX      = 3;
-const int MODE_PIN       = 4;
-const int HORN_IN_PIN    = 6;
-const int HORN_OUT_PIN   = 8;
 
-const int RADIO_PIN_CE   = 9;   // pin 3 on nRF24L01
-const int RADIO_PIN_CSN  = 10;  // pin 4 on nRF24L01
-const int RADIO_PIN_MOSI = 11;  // ??? pin 6 on nRF24L01
-const int RADIO_PIN_MISO = 7;   // ??? pin 7 on nRF24L01
+const int TLC_GSLCLK_PIN = 3;
+const int TEST_PIN_5     = 5;
+const int AUDIO_MOD_PIN  = 4;   // THIS IS PIN 4 on the atmega
+const int RADIO_PIN_CE   = 7;   // pin 3 on nRF24L01
+const int RADIO_PIN_CSN  = 8;  // pin 4 on nRF24L01
+const int XLAT_PIN       = 9;  // pin 
+const int BLANK_PIN      = 10;  // pin 
+const int RADIO_PIN_MOSI = 12;  // ??? pin 6 on nRF24L01
+const int RADIO_PIN_MISO = 11;  // ??? pin 7 on nRF24L01
 const int RADIO_PIN_SCK  = 13;  // ??? pin 5 on nRF24L01
 
-int SER_Pin = 1;   //pin 14 on the 75HC595
-int RCLK_Pin = 4;  //pin 12 on the 75HC595
-int SRCLK_Pin = 5; //pin 11 on the 75HC595
+// Vcc  Mosi  GND
+// Miso  SCK  RESET
 
+// BUTTON PINS
+const int LEFT_PIN       = 0;
+const int MODE_PIN       = 1;//1;
+const int RIGHT_PIN      = 2;//2;
+const int CANCEL_PIN     = 4;
+
+
+const int HORN_OUT_PIN   = 8;
+
+// SOFTWARE SERIAL
+const int SERIAL_RX      = 6;
+const int SERIAL_TX      = TEST_PIN_5;
+
+const int NO_TIMER = 999;
 
 const int num_messages = 2;
 const int MESSAGE_LED_STATE = 0;
@@ -89,33 +106,58 @@ unsigned int message;
 
 // ============================================================================ //
 // LED SETUP
+const int NUM_LEDS = 15;
+//TODO: Try this out by doing a mapping from pin to the 
+// INVERT then reorder
+// For the bike light
+//        8    7
+//    9           6
+// 13   10   5  4    1
+//    12          2
+//        11   3
+// 0                  14
+// Old Proto
+//        1    2
+//    3            4
+// 6     5   7   8    9       
+//    10          11
+//        12   13
+const int mapChannelIndexToLEDPosition[NUM_LEDS] = { 0,8,7,9,6,13,10,5,4,1,12,2,11,3,14  };
+//const int mapChannelIndexToLEDPosition[15] = { 0,1,8,2,11,3,4,5,6,7,10,12,13,9  };
+// For the test setup
+//const int mapChannelIndexToLEDPosition[16] = { 0,1,2,3,4,5,6,7,8,10,9,11,12,13,14 };
+const int maxChannelIndex =  NUM_LEDS-1;
 
-int ledPins[] = {0,1,2,3,4,5,6,7}; 
+const int LEFT_ARROW[NUM_LEDS] = { 0,9,0,9,0,9,9,9,9,9,9,0,9,0 };
+const int RIGHT_ARROW[NUM_LEDS] = { 0,0,9,0,9,9,9,9,9,9,0,9,0,9 };
 
-// Bitmasks for easy setting state of pins
-const unsigned int LEFT_SIGNAL_MASK = 0b111110101;
-//8,7,0,1,2,3,4,5,6,
-//const unsigned int LEFT_SIGNAL_MASK = 0b111100000;
-const unsigned int RIGHT_SIGNAL_MASK  = 0b101011111;
+const int ANN_2aPIN_1[NUM_LEDS] = { 0,9,0,0,0,0,0,0,0,0,0,0,0,0 };
+const int ANN_2aPIN_2[NUM_LEDS] = { 0,0,9,0,0,0,0,1,0,0,0,0,0,0 };
+const int ANN_2aPIN_3[NUM_LEDS] = { 0,0,0,0,9,0,0,2,0,0,0,0,0,0 };
+const int ANN_2aPIN_4[NUM_LEDS] = { 0,0,0,0,0,0,0,4,9,9,0,0,0,0 };
+const int ANN_2aPIN_5[NUM_LEDS] = { 0,0,0,0,0,0,0,9,0,0,0,9,0,0 };
+const int ANN_2aPIN_6[NUM_LEDS] = { 0,0,0,0,0,0,0,9,0,0,0,0,0,9 };
+const int ANN_2aPIN_7[NUM_LEDS] = { 0,0,0,0,0,0,0,4,0,0,0,0,9,0 };
+const int ANN_2aPIN_8[NUM_LEDS] = { 0,0,0,0,0,0,0,2,0,0,9,0,0,0 };
+const int ANN_2aPIN_9[NUM_LEDS] = { 0,0,0,0,0,9,9,1,0,0,0,0,0,0 };
+const int ANN_2aPIN_10[NUM_LEDS] = { 0,0,0,9,0,0,0,0,0,0,0,0,0,0 };
+const int *CLOCK_PULSE_ANN[10] = {ANN_2aPIN_2,ANN_2aPIN_3,ANN_2aPIN_4,ANN_2aPIN_5,
+                               ANN_2aPIN_6,ANN_2aPIN_7,ANN_2aPIN_8,ANN_2aPIN_9,ANN_2aPIN_10,ANN_2aPIN_1};   
 
-const unsigned int ANIMATION_1 = 0b100000000;
-const unsigned int ANIMATION_2 = 0b010000000;
-const unsigned int ANIMATION_3 = 0b000100000;
-const unsigned int ANIMATION_4 = 0b000001000;
-const unsigned int ANIMATION_5 = 0b000000010;
-const unsigned int ANIMATION_6 = 0b000000001;
-const unsigned int animation1Array[6] = {ANIMATION_1,ANIMATION_2,ANIMATION_3,ANIMATION_4,ANIMATION_5,ANIMATION_6};
-
-// ============================================================================ //
-// SHIFT REGISTER SETUP
-
-
-
-//How many of the shift registers - change this
-#define number_of_74hc595s 1 
-
-//do not touch
-#define numOfRegisterPins number_of_74hc595s * 8
-boolean registers[numOfRegisterPins];
+const int A1n[NUM_LEDS] = { 0,9,9,9,9,9,0,0,0,9,9,9,9,9 };
+const int A2n[NUM_LEDS] = { 0,8,8,8,8,8,1,1,1,8,8,8,8,8 };
+const int A3n[NUM_LEDS] = { 0,7,7,7,7,7,2,2,2,7,7,7,7,7 };
+const int A4n[NUM_LEDS] = { 0,6,6,6,6,6,3,3,3,6,6,6,6,6 };
+const int A5n[NUM_LEDS] = { 0,5,5,5,5,5,3,3,3,5,5,5,5,5 };
+const int A6n[NUM_LEDS] = { 0,4,4,4,4,4,4,4,4,4,4,4,4,4 };
+const int A7n[NUM_LEDS] = { 0,3,3,3,3,3,5,5,5,3,3,3,3,3 };
+const int A8n[NUM_LEDS] = { 0,2,2,2,2,2,6,6,6,2,2,2,2,2 };
+const int A9n[NUM_LEDS] = { 0,1,1,1,1,1,7,7,7,1,1,1,1,1 };
+const int A10n[NUM_LEDS] = {0,0,0,0,0,0,8,8,8,0,0,0,0,0 };
+const int A11n[NUM_LEDS] = { 0,0,0,0,0,0,9,9,9,0,0,0,0,0 };
+const int *BLINK_FADE_ANN[11] = {A1n,A2n,A3n,A4n,A5n,A6n,A7n,A8n,A9n,A10n,A11n};        
               
 #endif
+
+
+
