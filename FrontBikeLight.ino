@@ -32,7 +32,7 @@ RF24 radio(RADIO_PIN_CE,RADIO_PIN_CSN);
 // Radio pipe addresses for the 2 nodes to communicate.
 //const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
 //const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
-//const uint64_t pipe = 0xF0F0F0F0AA;
+const uint64_t writingPipe = 0xF0F0F0AA;
 
 // The debug-friendly names of those roles
 int retryCounter = 4;
@@ -161,21 +161,22 @@ int elapsedTimeSincePress = 0;
 // ============================================================================ //
 // INIT HELPERS
 
-void radioInit () {
-//  mySerial.println("Starting Radio Initialization"); 
-//
-//  radio.begin();
-//  radio.setPALevel(RF24_PA_MAX);
-//  // optionally, increase the delay between retries & # of retries
-//  radio.setRetries(15,15);
-//  // optionally, reduce the payload size.  seems to
-//  // improve reliability
-//  //  radio.setPayloadSize(8);
-//  radio.openWritingPipe(0xF0F0F0AA);
-//  radio.printDetails();
+void rf24Init () {
+  mySerial.println("Starting Radio Initialization"); 
+
+  radio.begin();
+  // Setting Power amplification to highest for testing
+  radio.setPALevel(RF24_PA_MAX);
+  // optionally, increase the delay between retries & # of retries
+  radio.setRetries(15,15);
+  // optionally, reduce the payload size.  seems to
+  // improve reliability
+  //  radio.setPayloadSize(8);
+  radio.openWritingPipe(writingPipe);
+  radio.printDetails();
 //  char *moreDetail = radio.getStats();
 //  mySerial.println(moreDetail);
-//  mySerial.println("Finished Radio Initialization"); 
+  mySerial.println("Finished Radio Initialization"); 
 }
 
 void buttonPinInit () {
@@ -193,10 +194,7 @@ void buttonPinInit () {
   
 //  pinMode(HORN_IN_PIN, INPUT);
 //  pinMode(HORN_OUT_PIN, OUTPUT);
-  
-  //numbers 0 (on digital pin 2) and 1 (on digital pin 3)
-//  attachInterrupt(0, leftButtonPress, FALLING);
-//  attachInterrupt(1, rightButtonPress, FALLING); 
+
   mySerial.println("Finished Button Pin Initialization"); 
 }
 
@@ -263,6 +261,7 @@ void setup() {
   buttonPinInit();
   tlcInit();
 
+  rf24Init();
   mySerial.println("\nBike Buddy Remote Initialization\n\r");
 }
 
@@ -367,22 +366,21 @@ void loop()
   }
 
   bool receivedAudioModemInput = false;
-  LedState newState = checkModemForData();
-  if (LED_STATE_NONE != newState) {
-      mySerial.print("Received New State: "); 
-      mySerial.println(newState); 
-      currentLedState = newState;
-      receivedAudioModemInput = true;
-  }
+  // TODO enable if using audio modem feature
+//  LedState newState = checkModemForData();
+//  if (LED_STATE_NONE != newState) {
+//      mySerial.print("Received New State: "); 
+//      mySerial.println(newState); 
+//      currentLedState = newState;
+//      receivedAudioModemInput = true;
+//  }
   bool buttonStateDidChange = buttonStateChanged();
   if (retryCounter != 3 || buttonStateDidChange || receivedAudioModemInput)
   {
-    // broadcastMessage(currentLedState);
+     broadcastMessage(currentLedState);
   }
 
   displayLedsForState(currentLedState);
-
-  // delay(STANDARD_DELAY_MILLI);
 }
 
 bool broadcastMessage(int message) {
